@@ -1,0 +1,11 @@
+services:
+  lab8:
+    build: .
+    container_name: lab8_key_value
+    environment:
+      FLASK_PORT: 5000
+      DATA_FILE: /app/data.json
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./:/app

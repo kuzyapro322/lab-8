@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ЛР №8 — Key-value хранилище</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">Разработка программных приложений</p>
+            <h1>Key-value хранилище</h1>
+        </div>
+        <div class="limit-box">
+            <span>{{ default_limit }}</span>
+            <span>{{ write_limit }}</span>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section class="panel">
+            <div class="panel-header">
+                <h2>Сохранение значения</h2>
+                <span>POST /set</span>
+            </div>
+            <form class="form" id="set-form">
+                <label>
+                    Ключ
+                    <input name="key" value="student" required maxlength="100">
+                </label>
+                <label>
+                    Значение
+                    <textarea name="value" rows="4" required>ФБИ, лабораторная работа 8</textarea>
+                </label>
+                <button type="submit">Сохранить</button>
+            </form>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header">
+                <h2>Операции с ключом</h2>
+                <span>GET / DELETE</span>
+            </div>
+            <form class="form compact" id="key-form">
+                <label>
+                    Ключ
+                    <input name="key" value="student" required maxlength="100">
+                </label>
+                <div class="button-row">
+                    <button type="button" data-action="get">Получить</button>
+                    <button type="button" data-action="exists">Проверить</button>
+                    <button type="button" data-action="delete" class="danger">Удалить</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel result-panel">
+            <div class="panel-header">
+                <h2>Ответ сервера</h2>
+                <span>JSON</span>
+            </div>
+            <pre id="result">Ожидание запроса...</pre>
+        </section>
+
+        <section class="panel table-panel">
+            <div class="panel-header">
+                <h2>Текущие данные</h2>
+                <span id="count">{{ items|length }} ключа</span>
+            </div>
+            <p class="file-path">Файл хранения: {{ data_file }}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ключ</th>
+                        <th>Значение</th>
+                    </tr>
+                </thead>
+                <tbody id="items-body">
+                    {% for key, value in items.items() %}
+                        <tr>
+                            <td>{{ key }}</td>
+                            <td>{{ value }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const result = document.querySelector("#result");
+        const itemsBody = document.querySelector("#items-body");
+        const count = document.querySelector("#count");
+
+        function showResponse(payload, status) {
+            result.textContent = JSON.stringify({ status, body: payload }, null, 4);
+            result.dataset.ok = String(status >= 200 && status < 300);
+        }
+
+        async function readJson(response) {
+            const payload = await response.json();
+            showResponse(payload, response.status);
+            await refreshTable();
+        }
+
+        async function refreshTable() {
+            const response = await fetch("/all");
+            const payload = await response.json();
+            itemsBody.innerHTML = "";
+
+            Object.entries(payload.data).forEach(([key, value]) => {
+                const row = document.createElement("tr");
+                const keyCell = document.createElement("td");
+                const valueCell = document.createElement("td");
+                keyCell.textContent = key;
+                valueCell.textContent = typeof value === "string" ? value : JSON.stringify(value);
+                row.append(keyCell, valueCell);
+                itemsBody.append(row);
+            });
+
+            count.textContent = `${payload.count} ключа`;
+        }
+
+        document.querySelector("#set-form").addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            const response = await fetch("/set", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: form.get("key"),
+                    value: form.get("value")
+                })
+            });
+            await readJson(response);
+        });
+
+        document.querySelector("#key-form").addEventListener("click", async (event) => {
+            const action = event.target.dataset.action;
+            if (!action) {
+                return;
+            }
+
+            const form = new FormData(event.currentTarget);
+            const key = encodeURIComponent(form.get("key"));
+            const route = action === "delete" ? `/delete/${key}` : `/${action}/${key}`;
+            const method = action === "delete" ? "DELETE" : "GET";
+            const response = await fetch(route, { method });
+            await readJson(response);
+        });
+    </script>
+</body>
+</html>
